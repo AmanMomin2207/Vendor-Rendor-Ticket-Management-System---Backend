@@ -22,7 +22,11 @@ public class TicketController {
     @PreAuthorize("hasRole('BUYER')")
     @PostMapping("/create")
     public ApiResponse<Ticket> create(@RequestBody CreateTicketRequest request) {
-        Ticket ticket = ticketService.createTicket(request);
+        Ticket ticket = ticketService.createTicket(
+                request.getTitle(),
+                request.getDescription(),
+                request.getPriority()
+        );
         return new ApiResponse<>(true, "Ticket created successfully", ticket);
     }
 
