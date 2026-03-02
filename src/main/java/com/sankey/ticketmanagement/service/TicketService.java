@@ -1,5 +1,7 @@
 package com.sankey.ticketmanagement.service;
 
+import com.sankey.ticketmanagement.exception.BadRequestException;
+import com.sankey.ticketmanagement.exception.ResourceNotFoundException;
 import com.sankey.ticketmanagement.model.*;
 import com.sankey.ticketmanagement.repository.*;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -46,10 +48,10 @@ public class TicketService {
     public Ticket assignTicket(String ticketId, String vendorId) {
 
         Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new RuntimeException("Ticket not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
 
         if (ticket.getStatus() != TicketStatus.OPEN) {
-            throw new RuntimeException("Only OPEN tickets can be assigned");
+            throw new BadRequestException("Only RESOLVED tickets can be closed");
         }
 
         TicketStatus oldStatus = ticket.getStatus();
@@ -69,7 +71,7 @@ public class TicketService {
     public Ticket updateStatus(String ticketId, TicketStatus newStatus) {
 
         Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new RuntimeException("Ticket not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
 
         TicketStatus current = ticket.getStatus();
 
@@ -93,10 +95,10 @@ public class TicketService {
     public Ticket closeTicket(String ticketId) {
 
         Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new RuntimeException("Ticket not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
 
         if (ticket.getStatus() != TicketStatus.RESOLVED) {
-            throw new RuntimeException("Only RESOLVED tickets can be closed");
+            throw new BadRequestException("Only RESOLVED tickets can be closed");
         }
 
         TicketStatus oldStatus = ticket.getStatus();
@@ -118,7 +120,7 @@ public class TicketService {
         if (current == TicketStatus.ASSIGNED && next == TicketStatus.IN_PROGRESS) return;
         if (current == TicketStatus.IN_PROGRESS && next == TicketStatus.RESOLVED) return;
 
-        throw new RuntimeException("Invalid status transition");
+        throw new BadRequestException("Invalid status transition");
     }
 
     // 🔹 Save history automatically
