@@ -1,8 +1,11 @@
 package com.sankey.ticketmanagement.repository;
 
+import com.sankey.ticketmanagement.model.Priority;
 import com.sankey.ticketmanagement.model.Ticket;
 import com.sankey.ticketmanagement.model.TicketStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
@@ -19,4 +22,16 @@ public interface TicketRepository extends MongoRepository<Ticket, String> {
     long countByAssignedToAndStatus(String assignedTo, TicketStatus status);
 
     List<Ticket> findByAssignedTo(String assignedTo);
+
+    Page<Ticket> findByCreatedBy(String createdBy, Pageable pageable);
+
+    Page<Ticket> findByAssignedTo(String assignedTo, Pageable pageable);
+
+    Page<Ticket> findByStatus(TicketStatus status, Pageable pageable);
+
+    Page<Ticket> findByPriority(Priority priority, Pageable pageable);
+
+    Page<Ticket> findByStatusAndPriority(TicketStatus status,
+                                        Priority priority,
+                                        Pageable pageable);
 }

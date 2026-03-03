@@ -1,7 +1,9 @@
 package com.sankey.ticketmanagement.controller;
 
 import com.sankey.ticketmanagement.dto.*;
+import com.sankey.ticketmanagement.model.Priority;
 import com.sankey.ticketmanagement.model.Ticket;
+import com.sankey.ticketmanagement.model.TicketStatus;
 import com.sankey.ticketmanagement.payload.ApiResponse;
 import com.sankey.ticketmanagement.service.TicketService;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -54,5 +56,20 @@ public class TicketController {
     public ApiResponse<Ticket> close(@PathVariable String id) {
         Ticket ticket = ticketService.closeTicket(id);
         return new ApiResponse<>(true, "Ticket closed successfully", ticket);
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN','BUYER','VENDOR')")
+    @GetMapping
+    public ApiResponse<PagedResponse<Ticket>> getTickets(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size,
+            @RequestParam(required = false) TicketStatus status,
+            @RequestParam(required = false) Priority priority) {
+
+        return new ApiResponse<>(
+                true,
+                "Tickets fetched successfully",
+                ticketService.getTickets(page, size, status, priority)
+        );
     }
 }

@@ -1,11 +1,16 @@
 package com.sankey.ticketmanagement.service;
 
+import com.sankey.ticketmanagement.dto.PagedResponse;
 import com.sankey.ticketmanagement.exception.BadRequestException;
 import com.sankey.ticketmanagement.exception.ResourceNotFoundException;
 import com.sankey.ticketmanagement.model.*;
 import com.sankey.ticketmanagement.repository.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 
 import java.time.LocalDateTime;
 
@@ -140,5 +145,39 @@ public class TicketService {
                 .build();
 
         historyRepository.save(history);
+    }
+
+    public PagedResponse<Ticket> getTickets(
+            int page,
+            int size,
+            TicketStatus status,
+            Priority priority) {
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by("createdAt").descending()
+        );
+
+        Page<Ticket> ticketPage;
+
+        if (status != null && priority != null) {
+            ticketPage = ticketRepository.findByStatusAndPriority(status, priority, pageable);
+        } else if (status != null) {
+            ticketPage = ticketRepository.findByStatus(status, pageable);
+        } else if (priority != null) {
+            ticketPage = ticketRepository.findByPriority(priority, pageable);
+        } else {
+            ticketPage = ticketRepository.findAll(pageable);
+        }
+
+        return new PagedResponse<>(
+                ticketPage.getContent(),
+                ticketPage.getNumber(),
+                ticketPage.getSize(),
+                ticketPage.getTotalElements(),
+                ticketPage.getTotalPages(),
+                ticketPage.isLast()
+        );
     }
 }
