@@ -10,6 +10,13 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.io.ByteArrayInputStream;
+
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+
 @RestController
 @RequestMapping("/api/tickets")
 @CrossOrigin("*")
@@ -87,5 +94,20 @@ public class TicketController {
                         email
                 )
         );
+    }
+    
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/export")
+    public ResponseEntity<InputStreamResource> exportTickets() {
+
+        ByteArrayInputStream csvData = ticketService.exportTicketsToCSV();
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.add("Content-Disposition", "attachment; filename=tickets.csv");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(new InputStreamResource(csvData));
     }
 }

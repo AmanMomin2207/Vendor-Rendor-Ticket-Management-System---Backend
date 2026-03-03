@@ -11,8 +11,13 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class TicketService {
@@ -220,5 +225,33 @@ public class TicketService {
         }
 
         return ticketRepository.findAll(pageable);
+    }
+
+    public ByteArrayInputStream exportTicketsToCSV() {
+
+        List<Ticket> tickets = ticketRepository.findAll();
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PrintWriter writer = new PrintWriter(out);
+
+        // CSV Header
+        writer.println("ID,Title,Description,Priority,Status,CreatedBy,AssignedTo,CreatedAt");
+
+        for (Ticket ticket : tickets) {
+            writer.println(
+                    ticket.getId() + "," +
+                    ticket.getTitle() + "," +
+                    ticket.getDescription() + "," +
+                    ticket.getPriority() + "," +
+                    ticket.getStatus() + "," +
+                    ticket.getCreatedBy() + "," +
+                    ticket.getAssignedTo() + "," +
+                    ticket.getCreatedAt()
+            );
+        }
+
+        writer.flush();
+
+        return new ByteArrayInputStream(out.toByteArray());
     }
 }
