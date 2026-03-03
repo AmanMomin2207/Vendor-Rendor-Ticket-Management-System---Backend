@@ -151,7 +151,8 @@ public class TicketService {
             int page,
             int size,
             TicketStatus status,
-            Priority priority) {
+            Priority priority,
+            String email) {
 
         Pageable pageable = PageRequest.of(
                 page,
@@ -159,16 +160,27 @@ public class TicketService {
                 Sort.by("createdAt").descending()
         );
 
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
         Page<Ticket> ticketPage;
 
-        if (status != null && priority != null) {
-            ticketPage = ticketRepository.findByStatusAndPriority(status, priority, pageable);
-        } else if (status != null) {
-            ticketPage = ticketRepository.findByStatus(status, pageable);
-        } else if (priority != null) {
-            ticketPage = ticketRepository.findByPriority(priority, pageable);
+        if (user.getRole().name().equals("ADMIN")) {
+
+            ticketPage = applyFilters(status, priority, pageable);
+
+        } else if (user.getRole().name().equals("BUYER")) {
+
+            ticketPage = ticketRepository
+                    .findByCreatedBy(user.getId(), pageable);
+
+        } else if (user.getRole().name().equals("VENDOR")) {
+
+            ticketPage = ticketRepository
+                    .findByAssignedTo(user.getId(), pageable);
+
         } else {
-            ticketPage = ticketRepository.findAll(pageable);
+            throw new RuntimeException("Invalid role");
         }
 
         return new PagedResponse<>(
@@ -179,5 +191,25 @@ public class TicketService {
                 ticketPage.getTotalPages(),
                 ticketPage.isLast()
         );
+    }
+    
+    private Page<Ticket> applyFilters(
+            TicketStatus status,
+            Priority priority,
+            Pageable pageable) {
+
+        if (status != null && priority != null) {
+            return ticketRepository.findByStatusAndPriority(status, priority, pageable);
+        }
+
+        if (status != null) {
+            return ticketRepository.findByStatus(status, pageable);
+        }
+
+        if (priority != null) {
+            return ticketRepository.findByPriority(priority, pageable);
+        }
+
+        return ticketRepository.findAll(pageable);
     }
 }

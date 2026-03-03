@@ -7,6 +7,7 @@ import com.sankey.ticketmanagement.model.TicketStatus;
 import com.sankey.ticketmanagement.payload.ApiResponse;
 import com.sankey.ticketmanagement.service.TicketService;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -64,12 +65,15 @@ public class TicketController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
             @RequestParam(required = false) TicketStatus status,
-            @RequestParam(required = false) Priority priority) {
+            @RequestParam(required = false) Priority priority,
+            Authentication authentication) {
+
+        String email = authentication.getName();
 
         return new ApiResponse<>(
                 true,
                 "Tickets fetched successfully",
-                ticketService.getTickets(page, size, status, priority)
+                ticketService.getTickets(page, size, status, priority, email)
         );
     }
 }
