@@ -152,13 +152,16 @@ public class TicketService {
             int size,
             TicketStatus status,
             Priority priority,
+            String search,
+            String sortBy,
+            String direction,
             String email) {
 
-        Pageable pageable = PageRequest.of(
-                page,
-                size,
-                Sort.by("createdAt").descending()
-        );
+        Sort sort = direction.equalsIgnoreCase("asc") ?
+        Sort.by(sortBy).ascending() :
+        Sort.by(sortBy).descending();
+
+        Pageable pageable = PageRequest.of(page, size, sort);
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -167,7 +170,7 @@ public class TicketService {
 
         if (user.getRole().name().equals("ADMIN")) {
 
-            ticketPage = applyFilters(status, priority, pageable);
+            ticketPage = applyFilters(status, priority, search, pageable);
 
         } else if (user.getRole().name().equals("BUYER")) {
 
@@ -192,14 +195,16 @@ public class TicketService {
                 ticketPage.isLast()
         );
     }
-    
+
     private Page<Ticket> applyFilters(
             TicketStatus status,
             Priority priority,
+            String search,
             Pageable pageable) {
 
-        if (status != null && priority != null) {
-            return ticketRepository.findByStatusAndPriority(status, priority, pageable);
+        if (status != null && search != null) {
+            return ticketRepository
+                    .findByStatusAndTitleContainingIgnoreCase(status, search, pageable);
         }
 
         if (status != null) {
@@ -208,6 +213,10 @@ public class TicketService {
 
         if (priority != null) {
             return ticketRepository.findByPriority(priority, pageable);
+        }
+
+        if (search != null) {
+            return ticketRepository.findByTitleContainingIgnoreCase(search, pageable);
         }
 
         return ticketRepository.findAll(pageable);

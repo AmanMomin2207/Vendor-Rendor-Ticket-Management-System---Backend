@@ -66,6 +66,9 @@ public class TicketController {
             @RequestParam(defaultValue = "5") int size,
             @RequestParam(required = false) TicketStatus status,
             @RequestParam(required = false) Priority priority,
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "desc") String direction,
             Authentication authentication) {
 
         String email = authentication.getName();
@@ -73,7 +76,16 @@ public class TicketController {
         return new ApiResponse<>(
                 true,
                 "Tickets fetched successfully",
-                ticketService.getTickets(page, size, status, priority, email)
+                ticketService.getTickets(
+                        page,
+                        size,
+                        status,
+                        priority,
+                        search,
+                        sortBy,
+                        direction,
+                        email
+                )
         );
     }
 }

@@ -34,4 +34,11 @@ public interface TicketRepository extends MongoRepository<Ticket, String> {
     Page<Ticket> findByStatusAndPriority(TicketStatus status,
                                         Priority priority,
                                         Pageable pageable);
+
+    Page<Ticket> findByTitleContainingIgnoreCase(String title, Pageable pageable);
+
+    Page<Ticket> findByStatusAndTitleContainingIgnoreCase(
+        TicketStatus status,
+        String title,
+        Pageable pageable);
 }
