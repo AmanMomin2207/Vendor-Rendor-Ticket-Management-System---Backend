@@ -4,6 +4,7 @@ import com.sankey.ticketmanagement.dto.DashboardResponse;
 import com.sankey.ticketmanagement.payload.ApiResponse;
 import com.sankey.ticketmanagement.service.DashboardService;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -18,10 +19,13 @@ public class DashboardController {
     }
 
     @PreAuthorize("hasRole('BUYER')")
-    @GetMapping("/buyer/{buyerId}")
-    public ApiResponse<DashboardResponse> buyerDashboard(@PathVariable String buyerId) {
+    @GetMapping("/buyer")
+    public ApiResponse<DashboardResponse> buyerDashboard(Authentication authentication) {
+        
+        String email = authentication.getName();
+        
         return new ApiResponse<>(true, "Buyer Dashboard",
-                dashboardService.getBuyerDashboard(buyerId));
+                dashboardService.getBuyerDashboardByEmail(email));
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -32,9 +36,12 @@ public class DashboardController {
     }
 
     @PreAuthorize("hasRole('VENDOR')")
-    @GetMapping("/vendor/{vendorId}")
-    public ApiResponse<DashboardResponse> vendorDashboard(@PathVariable String vendorId) {
+    @GetMapping("/vendor")
+    public ApiResponse<DashboardResponse> vendorDashboard(Authentication authentication) {
+        
+        String email = authentication.getName();
+
         return new ApiResponse<>(true, "Vendor Dashboard",
-                dashboardService.getVendorDashboard(vendorId));
+                dashboardService.getVendorDashboardByEmail(email));
     }
 }

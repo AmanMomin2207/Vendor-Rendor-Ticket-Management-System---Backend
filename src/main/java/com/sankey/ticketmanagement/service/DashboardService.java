@@ -2,20 +2,29 @@ package com.sankey.ticketmanagement.service;
 
 import com.sankey.ticketmanagement.dto.DashboardResponse;
 import com.sankey.ticketmanagement.model.TicketStatus;
+import com.sankey.ticketmanagement.model.User;
 import com.sankey.ticketmanagement.repository.TicketRepository;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.sankey.ticketmanagement.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
 @Service
 public class DashboardService {
 
     private final TicketRepository ticketRepository;
+    private final UserRepository userRepository;
 
-    public DashboardService(TicketRepository ticketRepository) {
+    public DashboardService(TicketRepository ticketRepository,
+                            UserRepository userRepository) {
         this.ticketRepository = ticketRepository;
+        this.userRepository = userRepository;
     }
 
-    public DashboardResponse getBuyerDashboard(String buyerId) {
+    public DashboardResponse getBuyerDashboardByEmail(String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String buyerId = user.getId();
 
         long total = ticketRepository.countBycreatedBy(buyerId);
         long open = ticketRepository.countBycreatedByAndStatus(buyerId, TicketStatus.OPEN);
@@ -35,7 +44,12 @@ public class DashboardService {
         return new DashboardResponse(total, open, inProgress, resolved, closed);
     }
 
-    public DashboardResponse getVendorDashboard(String vendorId) {
+    public DashboardResponse getVendorDashboardByEmail(String email) {
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        String vendorId = user.getId();
 
         long total = ticketRepository.countByAssignedTo(vendorId);
         long inProgress = ticketRepository.countByAssignedToAndStatus(vendorId, TicketStatus.IN_PROGRESS);
