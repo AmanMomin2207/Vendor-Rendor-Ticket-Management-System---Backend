@@ -3,6 +3,7 @@ package com.sankey.ticketmanagement.service;
 import com.sankey.ticketmanagement.dto.PagedResponse;
 import com.sankey.ticketmanagement.exception.BadRequestException;
 import com.sankey.ticketmanagement.exception.ResourceNotFoundException;
+import com.sankey.ticketmanagement.exception.UnauthorizedException;
 import com.sankey.ticketmanagement.model.*;
 import com.sankey.ticketmanagement.repository.*;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -55,10 +56,25 @@ public class TicketService {
     }
 
     // Only ADMIN get all tickets
-    public Ticket getTicketById(String id) {
+    public Ticket getTicketById(String id, String email, String role) {
 
-        return ticketRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Ticket not found"));
+        Ticket ticket = ticketRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
+
+        if (role.equals("ADMIN")) return ticket;
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (role.equals("BUYER") && !ticket.getCreatedBy().equals(user.getId())) {
+            throw new UnauthorizedException("Access denied");
+        }
+
+        if (role.equals("VENDOR") && !user.getId().equals(ticket.getAssignedTo())) {
+            throw new UnauthorizedException("Access denied");
+        }
+
+        return ticket;
     }
 
     // 🔹 ADMIN assigns ticket

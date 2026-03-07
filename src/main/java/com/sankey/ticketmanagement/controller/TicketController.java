@@ -29,17 +29,15 @@ public class TicketController {
     }
 
     //Admin only
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','BUYER','VENDOR')")
     @GetMapping("/{id}")
-    public ApiResponse<Ticket> getTicketById(@PathVariable String id) {
+    public ApiResponse<Ticket> getTicketById(@PathVariable String id,
+                                            Authentication authentication) {
+        String email = authentication.getName();
+        String role = authentication.getAuthorities().iterator().next()
+                        .getAuthority().replace("ROLE_", "");
 
-        Ticket ticket = ticketService.getTicketById(id);
-
-        return new ApiResponse<>(
-                true,
-                "Ticket fetched successfully",
-                ticket
-        );
+        return new ApiResponse<>(true, "Ticket fetched", ticketService.getTicketById(id, email, role));
     }
     
     // Buyer only
