@@ -277,4 +277,8 @@ public class TicketService {
 
         return new ByteArrayInputStream(out.toByteArray());
     }
+
+    public List<TicketHistory> getTicketHistory(String ticketId) {
+        return historyRepository.findByTicketIdOrderByChangedAtAsc(ticketId);
+    }
 }

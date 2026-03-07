@@ -3,6 +3,7 @@ package com.sankey.ticketmanagement.controller;
 import com.sankey.ticketmanagement.dto.*;
 import com.sankey.ticketmanagement.model.Priority;
 import com.sankey.ticketmanagement.model.Ticket;
+import com.sankey.ticketmanagement.model.TicketHistory;
 import com.sankey.ticketmanagement.model.TicketStatus;
 import com.sankey.ticketmanagement.payload.ApiResponse;
 import com.sankey.ticketmanagement.service.TicketService;
@@ -11,6 +12,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.ByteArrayInputStream;
+import java.util.List;
 
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
@@ -106,6 +108,12 @@ public class TicketController {
                         email
                 )
         );
+    }
+
+    @PreAuthorize("hasAnyRole('ADMIN','BUYER','VENDOR')")
+    @GetMapping("/{id}/history")
+    public ApiResponse<List<TicketHistory>> getTicketHistory(@PathVariable String id) {
+        return new ApiResponse<>(true, "History fetched", ticketService.getTicketHistory(id));
     }
     
     @PreAuthorize("hasRole('ADMIN')")
