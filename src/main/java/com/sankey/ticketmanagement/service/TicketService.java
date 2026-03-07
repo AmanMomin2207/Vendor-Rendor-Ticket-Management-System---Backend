@@ -54,6 +54,13 @@ public class TicketService {
         return ticketRepository.save(ticket);
     }
 
+    // Only ADMIN get all tickets
+    public Ticket getTicketById(String id) {
+
+        return ticketRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Ticket not found"));
+    }
+
     // 🔹 ADMIN assigns ticket
     public Ticket assignTicket(String ticketId, String vendorId) {
 

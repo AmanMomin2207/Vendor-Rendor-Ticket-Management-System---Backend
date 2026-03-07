@@ -28,6 +28,20 @@ public class TicketController {
         this.ticketService = ticketService;
     }
 
+    //Admin only
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/{id}")
+    public ApiResponse<Ticket> getTicketById(@PathVariable String id) {
+
+        Ticket ticket = ticketService.getTicketById(id);
+
+        return new ApiResponse<>(
+                true,
+                "Ticket fetched successfully",
+                ticket
+        );
+    }
+    
     // Buyer only
     @PreAuthorize("hasRole('BUYER')")
     @PostMapping("/create")
