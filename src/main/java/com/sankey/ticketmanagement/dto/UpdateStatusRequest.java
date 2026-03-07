@@ -6,4 +6,5 @@ import lombok.Data;
 @Data
 public class UpdateStatusRequest {
     private TicketStatus status;
+    private String resolutionNote; 
 }

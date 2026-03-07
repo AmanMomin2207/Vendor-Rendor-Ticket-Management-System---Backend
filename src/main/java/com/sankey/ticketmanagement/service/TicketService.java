@@ -101,7 +101,7 @@ public class TicketService {
     }
 
     // 🔹 VENDOR updates status
-    public Ticket updateStatus(String ticketId, TicketStatus newStatus) {
+    public Ticket updateStatus(String ticketId, TicketStatus newStatus, String resolutionNote) {
 
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
@@ -115,6 +115,11 @@ public class TicketService {
 
         if (newStatus == TicketStatus.RESOLVED) {
             ticket.setResolvedAt(LocalDateTime.now());
+
+            // save resolution note if provided
+            if (resolutionNote != null && !resolutionNote.isBlank()) {
+                ticket.setResolutionNote(resolutionNote);
+            }
         }
 
         Ticket updated = ticketRepository.save(ticket);

@@ -35,4 +35,6 @@ public class Ticket {
     private LocalDateTime resolvedAt;
 
     private LocalDateTime closedAt;
+
+    private String resolutionNote;
 }

@@ -68,7 +68,11 @@ public class TicketController {
     @PutMapping("/{id}/status")
     public ApiResponse<Ticket> updateStatus(@PathVariable String id,
                                             @RequestBody UpdateStatusRequest request) {
-        Ticket ticket = ticketService.updateStatus(id, request.getStatus());
+        Ticket ticket = ticketService.updateStatus(
+                id,
+                request.getStatus(),
+                request.getResolutionNote()  // 👈 pass it through
+        );
         return new ApiResponse<>(true, "Status updated successfully", ticket);
     }
 

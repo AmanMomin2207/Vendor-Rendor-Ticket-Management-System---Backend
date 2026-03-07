@@ -41,4 +41,7 @@ public interface TicketRepository extends MongoRepository<Ticket, String> {
         TicketStatus status,
         String title,
         Pageable pageable);
+
+    List<Ticket> findByAssignedToAndStatus(String assignedTo, TicketStatus status);
+
 }
