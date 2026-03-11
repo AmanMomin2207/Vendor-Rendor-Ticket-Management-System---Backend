@@ -18,7 +18,8 @@ public class CorsConfig {
 
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
-                "https://vendor-rendor-ticket-management-system-qir0.onrender.com"
+                "https://vendor-rendor-ticket-management-system-qir0.onrender.com",
+                "https://vendorbuyerticketmanagement.vercel.app"
         ));
 
         configuration.setAllowedMethods(List.of(
