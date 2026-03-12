@@ -8,4 +8,7 @@ public class CreateTicketRequest {
     private String title;
     private String description;
     private Priority priority;
+    private String attachmentName; // optional
+    private String attachmentType; // optional
+    private String attachmentData; // optional — Base64 string
 }

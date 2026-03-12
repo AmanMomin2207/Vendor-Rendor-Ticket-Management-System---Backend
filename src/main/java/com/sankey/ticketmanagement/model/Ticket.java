@@ -40,13 +40,9 @@ public class Ticket {
 
     private String resolutionNote;
 
-    public List<Ticket> getAttachments() {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'getAttachments'");
-    }
+    private String attachmentName;     // original file name
 
-    public void setAttachments(ArrayList arrayList) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Unimplemented method 'setAttachments'");
-    }
+    private String attachmentType;     // MIME type e.g. application/pdf
+    
+    private String attachmentData;     // Base64 encoded file content
 }

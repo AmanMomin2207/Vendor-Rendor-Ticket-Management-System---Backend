@@ -1,17 +1,17 @@
 package com.sankey.ticketmanagement.controller;
 
 import com.sankey.ticketmanagement.dto.*;
+import com.sankey.ticketmanagement.exception.ResourceNotFoundException;
 import com.sankey.ticketmanagement.model.Priority;
 import com.sankey.ticketmanagement.model.Ticket;
-import com.sankey.ticketmanagement.model.TicketAttachment;
 import com.sankey.ticketmanagement.model.TicketHistory;
 import com.sankey.ticketmanagement.model.TicketStatus;
 import com.sankey.ticketmanagement.payload.ApiResponse;
+import com.sankey.ticketmanagement.repository.TicketRepository;
 import com.sankey.ticketmanagement.service.TicketService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.util.List;
@@ -27,9 +27,11 @@ import org.springframework.http.ResponseEntity;
 public class TicketController {
 
     private final TicketService ticketService;
+    private final TicketRepository ticketRepository;
 
-    public TicketController(TicketService ticketService) {
+    public TicketController(TicketService ticketService, TicketRepository ticketRepository) {
         this.ticketService = ticketService;
+        this.ticketRepository = ticketRepository;
     }
 
     //Admin only
@@ -51,7 +53,10 @@ public class TicketController {
         Ticket ticket = ticketService.createTicket(
                 request.getTitle(),
                 request.getDescription(),
-                request.getPriority()
+                request.getPriority(),
+                request.getAttachmentName(),
+                request.getAttachmentType(),
+                request.getAttachmentData()
         );
         return new ApiResponse<>(true, "Ticket created successfully", ticket);
     }
@@ -137,53 +142,44 @@ public class TicketController {
                 .body(new InputStreamResource(csvData));
     }
 
-    // ── Upload attachment ──────────────────────────────────────────
     @PreAuthorize("hasAnyRole('ADMIN','BUYER','VENDOR')")
-    @PostMapping("/{id}/attachments")
-    public ApiResponse<Ticket> uploadAttachment(
-            @PathVariable String id,
-            @RequestParam("file") MultipartFile file) throws Exception {
+    @GetMapping("/{id}/attachment/info")
+    public ApiResponse<TicketAttachmentResponse> getAttachmentInfo(
+            @PathVariable String id) {
 
-        var data = fileService.processFile(file);
+        Ticket ticket = ticketRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
 
-        TicketAttachment attachment = new TicketAttachment(
-                data.id(),
-                data.fileName(),
-                data.fileType(),
-                data.fileSize(),
-                data.base64Data()
-        );
-
-        Ticket ticket = ticketService.addAttachment(id, attachment);
-        return new ApiResponse<>(true, "File uploaded successfully", ticket);
+        return new ApiResponse<>(true, "Attachment info",
+                new TicketAttachmentResponse(
+                        ticket.getId(),
+                        ticket.getAttachmentName(),
+                        ticket.getAttachmentType(),
+                        ticket.getAttachmentData() != null
+                ));
     }
 
-    // ── Delete attachment ──────────────────────────────────────────
-    @PreAuthorize("hasAnyRole('ADMIN','BUYER')")
-    @DeleteMapping("/{id}/attachments/{attachmentId}")
-    public ApiResponse<Ticket> deleteAttachment(
-            @PathVariable String id,
-            @PathVariable String attachmentId) {
-
-        Ticket ticket = ticketService.removeAttachment(id, attachmentId);
-        return new ApiResponse<>(true, "Attachment deleted", ticket);
-    }
-
-    // ── Download/view a single attachment ─────────────────────────
+    // New: download attachment — returns Base64 data
     @PreAuthorize("hasAnyRole('ADMIN','BUYER','VENDOR')")
-    @GetMapping("/{id}/attachments/{attachmentId}")
-    public ResponseEntity<byte[]> downloadAttachment(
-            @PathVariable String id,
-            @PathVariable String attachmentId) {
+    @GetMapping("/{id}/attachment/download")
+    public ResponseEntity<byte[]> downloadAttachment(@PathVariable String id) {
 
-        TicketAttachment att = ticketService.getAttachment(id, attachmentId);
+        Ticket ticket = ticketRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
 
-        byte[] bytes = Base64.getDecoder().decode(att.getBase64Data());
+        if (ticket.getAttachmentData() == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        byte[] fileBytes = java.util.Base64.getDecoder()
+                .decode(ticket.getAttachmentData());
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "inline; filename=\"" + att.getFileName() + "\"")
-                .contentType(MediaType.parseMediaType(att.getFileType()))
-                .body(bytes);
+                .header("Content-Disposition",
+                        "attachment; filename=\"" + ticket.getAttachmentName() + "\"")
+                .contentType(org.springframework.http.MediaType
+                        .parseMediaType(ticket.getAttachmentType()))
+                .body(fileBytes);
     }
+
 }

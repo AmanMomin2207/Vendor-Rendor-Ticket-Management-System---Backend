@@ -36,11 +36,23 @@ public class TicketService {
     }
 
     // 🔹 BUYER creates ticket
-    public Ticket createTicket(String title, String description, Priority priority) {
+    public Ticket createTicket(String title, String description,
+                                Priority priority,
+                                String attachmentName,
+                                String attachmentType,
+                                String attachmentData) {
 
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication().getName();
+
         User buyer = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Validate file size — Base64 is ~33% larger than original
+        // 5MB original = ~6.7MB Base64
+        if (attachmentData != null && attachmentData.length() > 7_000_000) {
+            throw new BadRequestException("File too large. Maximum size is 5MB.");
+        }
 
         Ticket ticket = Ticket.builder()
                 .title(title)
@@ -48,6 +60,9 @@ public class TicketService {
                 .priority(priority)
                 .status(TicketStatus.OPEN)
                 .createdBy(buyer.getId())
+                .attachmentName(attachmentName)
+                .attachmentType(attachmentType)
+                .attachmentData(attachmentData)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
@@ -287,36 +302,4 @@ public class TicketService {
         return historyRepository.findByTicketIdOrderByChangedAtAsc(ticketId);
     }
 
-    public Ticket addAttachment(String ticketId, Ticket attachment) {
-        Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
-
-        if (ticket.getAttachments() == null)
-            ticket.setAttachments(new java.util.ArrayList<>());
-
-        ticket.getAttachments().add(attachment);
-        ticket.setUpdatedAt(LocalDateTime.now());
-        return ticketRepository.save(ticket);
-    }
-
-    public Ticket removeAttachment(String ticketId, String attachmentId) {
-        Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
-
-        if (ticket.getAttachments() != null)
-            ticket.getAttachments().removeIf(a -> a.getId().equals(attachmentId));
-
-        ticket.setUpdatedAt(LocalDateTime.now());
-        return ticketRepository.save(ticket);
-    }
-
-    public Ticket getAttachment(String ticketId, String attachmentId) {
-        Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
-
-        return ticket.getAttachments().stream()
-                .filter(a -> a.getId().equals(attachmentId))
-                .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException("Attachment not found"));
-    }
 }
