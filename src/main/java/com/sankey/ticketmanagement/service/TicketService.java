@@ -1,5 +1,6 @@
 package com.sankey.ticketmanagement.service;
 
+import com.sankey.ticketmanagement.dto.CreateTicketRequest;
 import com.sankey.ticketmanagement.dto.PagedResponse;
 import com.sankey.ticketmanagement.exception.BadRequestException;
 import com.sankey.ticketmanagement.exception.ResourceNotFoundException;
@@ -12,6 +13,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+
+import static org.mockito.Mockito.description;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
@@ -36,11 +40,7 @@ public class TicketService {
     }
 
     // 🔹 BUYER creates ticket
-    public Ticket createTicket(String title, String description,
-                                Priority priority,
-                                String attachmentName,
-                                String attachmentType,
-                                String attachmentData) {
+    public Ticket createTicket(CreateTicketRequest request) {
 
         String email = SecurityContextHolder.getContext()
                 .getAuthentication().getName();
@@ -50,19 +50,19 @@ public class TicketService {
 
         // Validate file size — Base64 is ~33% larger than original
         // 5MB original = ~6.7MB Base64
-        if (attachmentData != null && attachmentData.length() > 7_000_000) {
+        if (request.getAttachmentData() != null && request.getAttachmentData().length() > 7_000_000) {
             throw new BadRequestException("File too large. Maximum size is 5MB.");
         }
 
         Ticket ticket = Ticket.builder()
-                .title(title)
-                .description(description)
-                .priority(priority)
+                .title(request.getTitle())
+                .description(request.getDescription())
+                .priority(request.getPriority())
                 .status(TicketStatus.OPEN)
                 .createdBy(buyer.getId())
-                .attachmentName(attachmentName)
-                .attachmentType(attachmentType)
-                .attachmentData(attachmentData)
+                .attachmentName(request.getAttachmentName())
+                .attachmentType(request.getAttachmentType())
+                .attachmentData(request.getAttachmentData())
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();

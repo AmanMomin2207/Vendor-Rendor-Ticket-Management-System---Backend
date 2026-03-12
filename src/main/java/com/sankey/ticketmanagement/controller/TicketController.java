@@ -50,14 +50,7 @@ public class TicketController {
     @PreAuthorize("hasRole('BUYER')")
     @PostMapping("/create")
     public ApiResponse<Ticket> create(@RequestBody CreateTicketRequest request) {
-        Ticket ticket = ticketService.createTicket(
-                request.getTitle(),
-                request.getDescription(),
-                request.getPriority(),
-                request.getAttachmentName(),
-                request.getAttachmentType(),
-                request.getAttachmentData()
-        );
+        Ticket ticket = ticketService.createTicket(request);
         return new ApiResponse<>(true, "Ticket created successfully", ticket);
     }
 
