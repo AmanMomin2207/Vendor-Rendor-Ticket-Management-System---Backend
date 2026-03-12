@@ -286,4 +286,37 @@ public class TicketService {
     public List<TicketHistory> getTicketHistory(String ticketId) {
         return historyRepository.findByTicketIdOrderByChangedAtAsc(ticketId);
     }
+
+    public Ticket addAttachment(String ticketId, Ticket attachment) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
+
+        if (ticket.getAttachments() == null)
+            ticket.setAttachments(new java.util.ArrayList<>());
+
+        ticket.getAttachments().add(attachment);
+        ticket.setUpdatedAt(LocalDateTime.now());
+        return ticketRepository.save(ticket);
+    }
+
+    public Ticket removeAttachment(String ticketId, String attachmentId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
+
+        if (ticket.getAttachments() != null)
+            ticket.getAttachments().removeIf(a -> a.getId().equals(attachmentId));
+
+        ticket.setUpdatedAt(LocalDateTime.now());
+        return ticketRepository.save(ticket);
+    }
+
+    public Ticket getAttachment(String ticketId, String attachmentId) {
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
+
+        return ticket.getAttachments().stream()
+                .filter(a -> a.getId().equals(attachmentId))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Attachment not found"));
+    }
 }

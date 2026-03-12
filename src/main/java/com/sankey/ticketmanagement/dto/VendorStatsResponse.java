@@ -14,5 +14,5 @@ public class VendorStatsResponse {
     private long resolved;
     private long closed;
     private double resolutionRate;
-    private String avgResolutionTime; // e.g. "2d 4h"
+    private String avgResolutionTime;
 }

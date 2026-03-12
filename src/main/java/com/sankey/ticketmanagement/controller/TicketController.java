@@ -3,6 +3,7 @@ package com.sankey.ticketmanagement.controller;
 import com.sankey.ticketmanagement.dto.*;
 import com.sankey.ticketmanagement.model.Priority;
 import com.sankey.ticketmanagement.model.Ticket;
+import com.sankey.ticketmanagement.model.TicketAttachment;
 import com.sankey.ticketmanagement.model.TicketHistory;
 import com.sankey.ticketmanagement.model.TicketStatus;
 import com.sankey.ticketmanagement.payload.ApiResponse;
@@ -10,6 +11,7 @@ import com.sankey.ticketmanagement.service.TicketService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.util.List;
@@ -133,5 +135,55 @@ public class TicketController {
                 .headers(headers)
                 .contentType(MediaType.parseMediaType("text/csv"))
                 .body(new InputStreamResource(csvData));
+    }
+
+    // ── Upload attachment ──────────────────────────────────────────
+    @PreAuthorize("hasAnyRole('ADMIN','BUYER','VENDOR')")
+    @PostMapping("/{id}/attachments")
+    public ApiResponse<Ticket> uploadAttachment(
+            @PathVariable String id,
+            @RequestParam("file") MultipartFile file) throws Exception {
+
+        var data = fileService.processFile(file);
+
+        TicketAttachment attachment = new TicketAttachment(
+                data.id(),
+                data.fileName(),
+                data.fileType(),
+                data.fileSize(),
+                data.base64Data()
+        );
+
+        Ticket ticket = ticketService.addAttachment(id, attachment);
+        return new ApiResponse<>(true, "File uploaded successfully", ticket);
+    }
+
+    // ── Delete attachment ──────────────────────────────────────────
+    @PreAuthorize("hasAnyRole('ADMIN','BUYER')")
+    @DeleteMapping("/{id}/attachments/{attachmentId}")
+    public ApiResponse<Ticket> deleteAttachment(
+            @PathVariable String id,
+            @PathVariable String attachmentId) {
+
+        Ticket ticket = ticketService.removeAttachment(id, attachmentId);
+        return new ApiResponse<>(true, "Attachment deleted", ticket);
+    }
+
+    // ── Download/view a single attachment ─────────────────────────
+    @PreAuthorize("hasAnyRole('ADMIN','BUYER','VENDOR')")
+    @GetMapping("/{id}/attachments/{attachmentId}")
+    public ResponseEntity<byte[]> downloadAttachment(
+            @PathVariable String id,
+            @PathVariable String attachmentId) {
+
+        TicketAttachment att = ticketService.getAttachment(id, attachmentId);
+
+        byte[] bytes = Base64.getDecoder().decode(att.getBase64Data());
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"" + att.getFileName() + "\"")
+                .contentType(MediaType.parseMediaType(att.getFileType()))
+                .body(bytes);
     }
 }

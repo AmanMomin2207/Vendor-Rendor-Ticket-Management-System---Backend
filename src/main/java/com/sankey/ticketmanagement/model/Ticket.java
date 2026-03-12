@@ -5,6 +5,8 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @AllArgsConstructor
@@ -37,4 +39,14 @@ public class Ticket {
     private LocalDateTime closedAt;
 
     private String resolutionNote;
+
+    public List<Ticket> getAttachments() {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'getAttachments'");
+    }
+
+    public void setAttachments(ArrayList arrayList) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'setAttachments'");
+    }
 }
