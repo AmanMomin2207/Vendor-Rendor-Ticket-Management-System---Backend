@@ -8,41 +8,30 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
-@Builder
 @Document(collection = "tickets")
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class Ticket {
-
     @Id
     private String id;
-
     private String title;
-
     private String description;
-
     private Priority priority;
-
     private TicketStatus status;
-
-    private String createdBy;   // Buyer ID
-
-    private String assignedTo;  // Vendor ID
-
-    private LocalDateTime createdAt;
-
-    private LocalDateTime updatedAt;
-
-    private LocalDateTime resolvedAt;
-
-    private LocalDateTime closedAt;
-
+    private String createdBy;
+    private String assignedTo;
     private String resolutionNote;
 
-    private String attachmentName;     // original file name
+    // ✅ GridFS fields — replaces attachmentData (no more Base64 in DB)
+    private String fileId;           // GridFS ObjectId reference
+    private String attachmentName;   // original filename
+    private String attachmentType;   // MIME type
+    private Long attachmentSize;     // file size in bytes
 
-    private String attachmentType;     // MIME type e.g. application/pdf
-    
-    private String attachmentData;     // Base64 encoded file content
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private LocalDateTime resolvedAt;
+    private LocalDateTime closedAt;
 }

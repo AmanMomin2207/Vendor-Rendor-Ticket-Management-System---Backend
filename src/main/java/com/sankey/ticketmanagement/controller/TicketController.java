@@ -8,17 +8,21 @@ import com.sankey.ticketmanagement.model.TicketHistory;
 import com.sankey.ticketmanagement.model.TicketStatus;
 import com.sankey.ticketmanagement.payload.ApiResponse;
 import com.sankey.ticketmanagement.repository.TicketRepository;
+import com.sankey.ticketmanagement.service.FileStorageService;
 import com.sankey.ticketmanagement.service.TicketService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.core.io.InputStreamResource;
+import java.io.InputStream;
+import java.io.IOException;
 
 import java.io.ByteArrayInputStream;
 import java.util.List;
 
-import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @RestController
@@ -28,10 +32,13 @@ public class TicketController {
 
     private final TicketService ticketService;
     private final TicketRepository ticketRepository;
+    private final FileStorageService fileStorageService;
 
-    public TicketController(TicketService ticketService, TicketRepository ticketRepository) {
+
+    public TicketController(TicketService ticketService, TicketRepository ticketRepository, FileStorageService fileStorageService) {
         this.ticketService = ticketService;
         this.ticketRepository = ticketRepository;
+        this.fileStorageService = fileStorageService;
     }
 
     //Admin only
@@ -48,20 +55,22 @@ public class TicketController {
     
     // Buyer only
     @PreAuthorize("hasRole('BUYER')")
-    @PostMapping("/create")
-    public ApiResponse<Ticket> create(@RequestBody CreateTicketRequest request) {
-        Ticket ticket = ticketService.createTicket(request);
-        return new ApiResponse<>(true, "Ticket created successfully", ticket);
-    }
+        @PostMapping(value = "/create", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        public ApiResponse<Ticket> create(
+                @RequestParam("title") String title,
+                @RequestParam("description") String description,
+                @RequestParam("priority") String priority,
+                @RequestParam(value = "file", required = false) MultipartFile file
+        ) throws IOException {
 
-    // Admin only
-    @PreAuthorize("hasRole('ADMIN')")
-    @PutMapping("/{id}/assign")
-    public ApiResponse<Ticket> assign(@PathVariable String id,
-                                      @RequestBody AssignTicketRequest request) {
-        Ticket ticket = ticketService.assignTicket(id, request.getVendorId());
-        return new ApiResponse<>(true, "Ticket assigned successfully", ticket);
-    }
+        Ticket ticket = ticketService.createTicket(
+                title,
+                description,
+                Priority.valueOf(priority.toUpperCase()),
+                file
+        );
+        return new ApiResponse<>(true, "Ticket created successfully", ticket);
+        }
 
     // Vendor only
     @PreAuthorize("hasRole('VENDOR')")
@@ -135,44 +144,26 @@ public class TicketController {
                 .body(new InputStreamResource(csvData));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN','BUYER','VENDOR')")
-    @GetMapping("/{id}/attachment/info")
-    public ApiResponse<TicketAttachmentResponse> getAttachmentInfo(
-            @PathVariable String id) {
-
-        Ticket ticket = ticketRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
-
-        return new ApiResponse<>(true, "Attachment info",
-                new TicketAttachmentResponse(
-                        ticket.getId(),
-                        ticket.getAttachmentName(),
-                        ticket.getAttachmentType(),
-                        ticket.getAttachmentData() != null
-                ));
-    }
-
     // New: download attachment — returns Base64 data
-    @PreAuthorize("hasAnyRole('ADMIN','BUYER','VENDOR')")
-    @GetMapping("/{id}/attachment/download")
-    public ResponseEntity<byte[]> downloadAttachment(@PathVariable String id) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'BUYER', 'VENDOR')")
+        @GetMapping("/{id}/attachment/download")
+        public ResponseEntity<InputStreamResource> downloadAttachment(
+                @PathVariable String id) throws IOException {
 
         Ticket ticket = ticketRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
 
-        if (ticket.getAttachmentData() == null) {
-            return ResponseEntity.notFound().build();
+        if (ticket.getFileId() == null) {
+                return ResponseEntity.notFound().build();
         }
 
-        byte[] fileBytes = java.util.Base64.getDecoder()
-                .decode(ticket.getAttachmentData());
+        InputStream inputStream = fileStorageService.downloadFile(ticket.getFileId());
 
         return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(ticket.getAttachmentType()))
                 .header("Content-Disposition",
-                        "attachment; filename=\"" + ticket.getAttachmentName() + "\"")
-                .contentType(org.springframework.http.MediaType
-                        .parseMediaType(ticket.getAttachmentType()))
-                .body(fileBytes);
-    }
+                        "inline; filename=\"" + ticket.getAttachmentName() + "\"")
+                .body(new InputStreamResource(inputStream));
+        }
 
 }

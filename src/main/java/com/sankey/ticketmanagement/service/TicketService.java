@@ -7,17 +7,19 @@ import com.sankey.ticketmanagement.exception.ResourceNotFoundException;
 import com.sankey.ticketmanagement.exception.UnauthorizedException;
 import com.sankey.ticketmanagement.model.*;
 import com.sankey.ticketmanagement.repository.*;
+
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import java.io.IOException;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
-import java.nio.charset.StandardCharsets;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,39 +30,54 @@ public class TicketService {
     private final TicketRepository ticketRepository;
     private final TicketHistoryRepository historyRepository;
     private final UserRepository userRepository;
+    private final FileStorageService fileStorageService;
 
     public TicketService(TicketRepository ticketRepository,
                          TicketHistoryRepository historyRepository,
-                         UserRepository userRepository) {
+                         UserRepository userRepository, FileStorageService fileStorageService) {
         this.ticketRepository = ticketRepository;
         this.historyRepository = historyRepository;
         this.userRepository = userRepository;
+        this.fileStorageService = fileStorageService;
     }
 
     // 🔹 BUYER creates ticket
-    public Ticket createTicket(CreateTicketRequest request) {
+    public Ticket createTicket(String title, String description,
+                            Priority priority,
+                            MultipartFile file) throws IOException {
 
         String email = SecurityContextHolder.getContext()
                 .getAuthentication().getName();
-
         User buyer = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // Validate file size — Base64 is ~33% larger than original
-        // 5MB original = ~6.7MB Base64
-        if (request.getAttachmentData() != null && request.getAttachmentData().length() > 7_000_000) {
-            throw new BadRequestException("File too large. Maximum size is 5MB.");
+        // Upload file to GridFS if provided
+        String fileId = null;
+        String attachmentName = null;
+        String attachmentType = null;
+        Long attachmentSize = null;
+
+        if (file != null && !file.isEmpty()) {
+            // 5MB size limit
+            if (file.getSize() > 5 * 1024 * 1024) {
+                throw new BadRequestException("File too large. Maximum size is 5MB.");
+            }
+            fileId = fileStorageService.uploadFile(file);
+            attachmentName = file.getOriginalFilename();
+            attachmentType = file.getContentType();
+            attachmentSize = file.getSize();
         }
 
         Ticket ticket = Ticket.builder()
-                .title(request.getTitle())
-                .description(request.getDescription())
-                .priority(request.getPriority())
+                .title(title)
+                .description(description)
+                .priority(priority)
                 .status(TicketStatus.OPEN)
                 .createdBy(buyer.getId())
-                .attachmentName(request.getAttachmentName())
-                .attachmentType(request.getAttachmentType())
-                .attachmentData(request.getAttachmentData())
+                .fileId(fileId)
+                .attachmentName(attachmentName)
+                .attachmentType(attachmentType)
+                .attachmentSize(attachmentSize)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
