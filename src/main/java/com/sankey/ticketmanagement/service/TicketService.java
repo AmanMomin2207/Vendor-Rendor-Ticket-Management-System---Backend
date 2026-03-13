@@ -110,24 +110,48 @@ public class TicketService {
     // 🔹 ADMIN assigns ticket
     public Ticket assignTicket(String ticketId, String vendorId) {
 
+        // 1. Find ticket
         Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("Ticket not found: " + ticketId));
 
-        if (ticket.getStatus() != TicketStatus.OPEN) {
-            throw new BadRequestException("Only RESOLVED tickets can be closed");
+        // 2. Find vendor by ID
+        User vendor = userRepository.findById(vendorId)
+            .orElseThrow(() -> new ResourceNotFoundException("Vendor not found: " + vendorId));
+
+        // 3. Validate vendor role
+        if (vendor.getRole() != Role.VENDOR) {
+            throw new BadRequestException("Selected user is not a vendor");
         }
 
-        TicketStatus oldStatus = ticket.getStatus();
+        // 4. Validate ticket status
+        if (ticket.getStatus() != TicketStatus.OPEN) {
+            throw new BadRequestException("Only OPEN tickets can be assigned. Current: " + ticket.getStatus());
+        }
 
+        // 5. Get admin who is assigning (by email from JWT)
+        String adminEmail = SecurityContextHolder.getContext()
+            .getAuthentication().getName();
+
+        User admin = userRepository.findByEmail(adminEmail)
+            .orElseThrow(() -> new ResourceNotFoundException("Admin user not found: " + adminEmail));
+
+        // 6. Update ticket
         ticket.setAssignedTo(vendorId);
         ticket.setStatus(TicketStatus.ASSIGNED);
         ticket.setUpdatedAt(LocalDateTime.now());
+        Ticket saved = ticketRepository.save(ticket);
 
-        Ticket updated = ticketRepository.save(ticket);
+        // 7. Save history
+        TicketHistory history = TicketHistory.builder()
+            .ticketId(ticketId)
+            .oldStatus(TicketStatus.OPEN)
+            .newStatus(TicketStatus.ASSIGNED)
+            .changedBy(admin.getId())   // ✅ store userId not email
+            .changedAt(LocalDateTime.now())
+            .build();
+        historyRepository.save(history);
 
-        saveHistory(ticketId, oldStatus, TicketStatus.ASSIGNED);
-
-        return updated;
+        return saved;
     }
 
     // 🔹 VENDOR updates status

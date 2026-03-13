@@ -21,6 +21,7 @@ import java.io.IOException;
 
 import java.io.ByteArrayInputStream;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -40,6 +41,23 @@ public class TicketController {
         this.ticketRepository = ticketRepository;
         this.fileStorageService = fileStorageService;
     }
+
+    @PreAuthorize("hasRole('ADMIN')")
+        @PutMapping("/{id}/assign")
+        public ApiResponse<Ticket> assignTicket(
+                @PathVariable String id,
+                @RequestBody Map<String, String> body) {
+
+        String vendorId = body.get("vendorId");
+        System.out.println(">>> Assigning ticket: " + id + " to vendor: " + vendorId);
+
+        if (vendorId == null || vendorId.isBlank()) {
+                return new ApiResponse<>(false, "vendorId is required", null);
+        }
+
+        Ticket ticket = ticketService.assignTicket(id, vendorId);
+        return new ApiResponse<>(true, "Ticket assigned successfully", ticket);
+        }
 
     //Admin only
     @PreAuthorize("hasAnyRole('ADMIN','BUYER','VENDOR')")
