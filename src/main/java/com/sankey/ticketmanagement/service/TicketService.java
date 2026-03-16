@@ -1,0 +1,344 @@
+package com.sankey.ticketmanagement.service;
+
+import com.sankey.ticketmanagement.dto.CreateTicketRequest;
+import com.sankey.ticketmanagement.dto.PagedResponse;
+import com.sankey.ticketmanagement.exception.BadRequestException;
+import com.sankey.ticketmanagement.exception.ResourceNotFoundException;
+import com.sankey.ticketmanagement.exception.UnauthorizedException;
+import com.sankey.ticketmanagement.model.*;
+import com.sankey.ticketmanagement.repository.*;
+
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import java.io.IOException;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintWriter;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Service
+public class TicketService {
+
+    private final TicketRepository ticketRepository;
+    private final TicketHistoryRepository historyRepository;
+    private final UserRepository userRepository;
+    private final FileStorageService fileStorageService;
+
+    public TicketService(TicketRepository ticketRepository,
+                         TicketHistoryRepository historyRepository,
+                         UserRepository userRepository, FileStorageService fileStorageService) {
+        this.ticketRepository = ticketRepository;
+        this.historyRepository = historyRepository;
+        this.userRepository = userRepository;
+        this.fileStorageService = fileStorageService;
+    }
+
+    // 🔹 BUYER creates ticket
+    public Ticket createTicket(String title, String description,
+                            Priority priority,
+                            MultipartFile file) throws IOException {
+
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication().getName();
+        User buyer = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Upload file to GridFS if provided
+        String fileId = null;
+        String attachmentName = null;
+        String attachmentType = null;
+        Long attachmentSize = null;
+
+        if (file != null && !file.isEmpty()) {
+            // 5MB size limit
+            if (file.getSize() > 5 * 1024 * 1024) {
+                throw new BadRequestException("File too large. Maximum size is 5MB.");
+            }
+            fileId = fileStorageService.uploadFile(file);
+            attachmentName = file.getOriginalFilename();
+            attachmentType = file.getContentType();
+            attachmentSize = file.getSize();
+        }
+
+        Ticket ticket = Ticket.builder()
+                .title(title)
+                .description(description)
+                .priority(priority)
+                .status(TicketStatus.OPEN)
+                .createdBy(buyer.getId())
+                .fileId(fileId)
+                .attachmentName(attachmentName)
+                .attachmentType(attachmentType)
+                .attachmentSize(attachmentSize)
+                .createdAt(LocalDateTime.now())
+                .updatedAt(LocalDateTime.now())
+                .build();
+
+        return ticketRepository.save(ticket);
+    }
+
+    // Only ADMIN get all tickets
+    public Ticket getTicketById(String id, String email, String role) {
+
+        Ticket ticket = ticketRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
+
+        if (role.equals("ADMIN")) return ticket;
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        if (role.equals("BUYER") && !ticket.getCreatedBy().equals(user.getId())) {
+            throw new UnauthorizedException("Access denied");
+        }
+
+        if (role.equals("VENDOR") && !user.getId().equals(ticket.getAssignedTo())) {
+            throw new UnauthorizedException("Access denied");
+        }
+
+        return ticket;
+    }
+
+    // 🔹 ADMIN assigns ticket
+    public Ticket assignTicket(String ticketId, String vendorId) {
+
+        // 1. Find ticket
+        Ticket ticket = ticketRepository.findById(ticketId)
+            .orElseThrow(() -> new ResourceNotFoundException("Ticket not found: " + ticketId));
+
+        // 2. Find vendor by ID
+        User vendor = userRepository.findById(vendorId)
+            .orElseThrow(() -> new ResourceNotFoundException("Vendor not found: " + vendorId));
+
+        // 3. Validate vendor role
+        if (vendor.getRole() != Role.VENDOR) {
+            throw new BadRequestException("Selected user is not a vendor");
+        }
+
+        // 4. Validate ticket status
+        if (ticket.getStatus() != TicketStatus.OPEN) {
+            throw new BadRequestException("Only OPEN tickets can be assigned. Current: " + ticket.getStatus());
+        }
+
+        // 5. Get admin who is assigning (by email from JWT)
+        String adminEmail = SecurityContextHolder.getContext()
+            .getAuthentication().getName();
+
+        User admin = userRepository.findByEmail(adminEmail)
+            .orElseThrow(() -> new ResourceNotFoundException("Admin user not found: " + adminEmail));
+
+        // 6. Update ticket
+        ticket.setAssignedTo(vendorId);
+        ticket.setStatus(TicketStatus.ASSIGNED);
+        ticket.setUpdatedAt(LocalDateTime.now());
+        Ticket saved = ticketRepository.save(ticket);
+
+        // 7. Save history
+        TicketHistory history = TicketHistory.builder()
+            .ticketId(ticketId)
+            .oldStatus(TicketStatus.OPEN)
+            .newStatus(TicketStatus.ASSIGNED)
+            .changedBy(admin.getId())   // ✅ store userId not email
+            .changedAt(LocalDateTime.now())
+            .build();
+        historyRepository.save(history);
+
+        return saved;
+    }
+
+    // 🔹 VENDOR updates status
+    public Ticket updateStatus(String ticketId, TicketStatus newStatus, String resolutionNote) {
+
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
+
+        TicketStatus current = ticket.getStatus();
+
+        validateStatusTransition(current, newStatus);
+
+        ticket.setStatus(newStatus);
+        ticket.setUpdatedAt(LocalDateTime.now());
+
+        if (newStatus == TicketStatus.RESOLVED) {
+            ticket.setResolvedAt(LocalDateTime.now());
+
+            // save resolution note if provided
+            if (resolutionNote != null && !resolutionNote.isBlank()) {
+                ticket.setResolutionNote(resolutionNote);
+            }
+        }
+
+        Ticket updated = ticketRepository.save(ticket);
+
+        saveHistory(ticketId, current, newStatus);
+
+        return updated;
+    }
+
+    // 🔹 BUYER closes ticket
+    public Ticket closeTicket(String ticketId) {
+
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket not found"));
+
+        if (ticket.getStatus() != TicketStatus.RESOLVED) {
+            throw new BadRequestException("Only RESOLVED tickets can be closed");
+        }
+
+        TicketStatus oldStatus = ticket.getStatus();
+
+        ticket.setStatus(TicketStatus.CLOSED);
+        ticket.setClosedAt(LocalDateTime.now());
+        ticket.setUpdatedAt(LocalDateTime.now());
+
+        Ticket updated = ticketRepository.save(ticket);
+
+        saveHistory(ticketId, oldStatus, TicketStatus.CLOSED);
+
+        return updated;
+    }
+
+    // 🔹 Status validation rules
+    private void validateStatusTransition(TicketStatus current, TicketStatus next) {
+
+        if (current == TicketStatus.ASSIGNED && next == TicketStatus.IN_PROGRESS) return;
+        if (current == TicketStatus.IN_PROGRESS && next == TicketStatus.RESOLVED) return;
+
+        throw new BadRequestException("Invalid status transition");
+    }
+
+    // 🔹 Save history automatically
+    private void saveHistory(String ticketId,
+                             TicketStatus oldStatus,
+                             TicketStatus newStatus) {
+
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email).orElse(null);
+
+        TicketHistory history = TicketHistory.builder()
+                .ticketId(ticketId)
+                .oldStatus(oldStatus)
+                .newStatus(newStatus)
+                .changedBy(user != null ? user.getId() : null)
+                .changedAt(LocalDateTime.now())
+                .build();
+
+        historyRepository.save(history);
+    }
+
+    public PagedResponse<Ticket> getTickets(
+            int page,
+            int size,
+            TicketStatus status,
+            Priority priority,
+            String search,
+            String sortBy,
+            String direction,
+            String email) {
+
+        Sort sort = direction.equalsIgnoreCase("asc") ?
+        Sort.by(sortBy).ascending() :
+        Sort.by(sortBy).descending();
+
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Page<Ticket> ticketPage;
+
+        if (user.getRole().name().equals("ADMIN")) {
+
+            ticketPage = applyFilters(status, priority, search, pageable);
+
+        } else if (user.getRole().name().equals("BUYER")) {
+
+            ticketPage = ticketRepository
+                    .findByCreatedBy(user.getId(), pageable);
+
+        } else if (user.getRole().name().equals("VENDOR")) {
+
+            ticketPage = ticketRepository
+                    .findByAssignedTo(user.getId(), pageable);
+
+        } else {
+            throw new RuntimeException("Invalid role");
+        }
+
+        return new PagedResponse<>(
+                ticketPage.getContent(),
+                ticketPage.getNumber(),
+                ticketPage.getSize(),
+                ticketPage.getTotalElements(),
+                ticketPage.getTotalPages(),
+                ticketPage.isLast()
+        );
+    }
+
+    private Page<Ticket> applyFilters(
+            TicketStatus status,
+            Priority priority,
+            String search,
+            Pageable pageable) {
+
+        if (status != null && search != null) {
+            return ticketRepository
+                    .findByStatusAndTitleContainingIgnoreCase(status, search, pageable);
+        }
+
+        if (status != null) {
+            return ticketRepository.findByStatus(status, pageable);
+        }
+
+        if (priority != null) {
+            return ticketRepository.findByPriority(priority, pageable);
+        }
+
+        if (search != null) {
+            return ticketRepository.findByTitleContainingIgnoreCase(search, pageable);
+        }
+
+        return ticketRepository.findAll(pageable);
+    }
+
+    public ByteArrayInputStream exportTicketsToCSV() {
+
+        List<Ticket> tickets = ticketRepository.findAll();
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PrintWriter writer = new PrintWriter(out);
+
+        // CSV Header
+        writer.println("ID,Title,Description,Priority,Status,CreatedBy,AssignedTo,CreatedAt");
+
+        for (Ticket ticket : tickets) {
+            writer.println(
+                    ticket.getId() + "," +
+                    ticket.getTitle() + "," +
+                    ticket.getDescription() + "," +
+                    ticket.getPriority() + "," +
+                    ticket.getStatus() + "," +
+                    ticket.getCreatedBy() + "," +
+                    ticket.getAssignedTo() + "," +
+                    ticket.getCreatedAt()
+            );
+        }
+
+        writer.flush();
+
+        return new ByteArrayInputStream(out.toByteArray());
+    }
+
+    public List<TicketHistory> getTicketHistory(String ticketId) {
+        return historyRepository.findByTicketIdOrderByChangedAtAsc(ticketId);
+    }
+
+}
