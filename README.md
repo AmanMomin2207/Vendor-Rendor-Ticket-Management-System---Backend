@@ -181,7 +181,7 @@ curl -X POST http://localhost:8080/api/auth/login \
 | Property | Description | Example |
 |---|---|---|
 | `spring.data.mongodb.uri` | MongoDB Atlas connection string | `mongodb+srv://...` |
-| JWT secret | Hardcoded in `JwtUtil.java` | Change before production |
+| JWT secret | hardcoded in application.properties | Change before production |
 
 ### `application.properties`
 
